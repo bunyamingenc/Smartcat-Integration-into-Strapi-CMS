@@ -220,10 +220,6 @@ The project demonstrates the full localization pipeline: **content extraction �
 
 ---
 
-## Author
-
-**Bünyamin Genç**  
-Junior Localization Engineer — Hacettepe University  
 [github.com/bunyamingenc](https://github.com/bunyamingenc)
 
 ---
