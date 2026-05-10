@@ -1,32 +1,43 @@
 # LocaleSync
 
-> A translation management dashboard that connects **Strapi CMS** with **Smartcat** — built for localization engineers.
+**A translation management dashboard connecting Strapi CMS with Smartcat — built for localization engineers.**
 
-LocaleSync lets you register CMS articles, push content to a Smartcat translation project, monitor per-language progress in real time, and pull completed translations back into your CMS — all from a single dashboard.
+LocaleSync bridges the gap between headless CMS content and professional TMS workflows. Register articles, push content to Smartcat, monitor per-language translation progress in real time, and pull completed translations back into Strapi — all from a single dashboard, with no manual copy-paste.
 
 ---
 
 ## Screenshots
 
-**Articles dashboard — multiple projects, per-locale progress**
-![Articles Dashboard](docs/screenshot-articles.png)
+**Articles — card view with per-locale progress bars**
+![Articles Card View](docs/screenshot-articles.png)
 
-**Article detail modal — language table with live translation progress**
-![Article Detail Modal](docs/screenshot-modal.png)
+**Locale matrix — full translation coverage at a glance**
+![Locale Matrix](docs/screenshot-matrix.png)
 
-**Settings — credential management, stored locally in the browser**
-![Settings](docs/screenshot-settings.png)
+**Article detail modal — locale status, XLIFF download/upload, diff view**
+![Article Modal](docs/screenshot-modal.png)
+
+**Activity log — full audit trail of every pipeline action**
+![Activity Log](docs/screenshot-activity.png)
 
 ---
 
-## What it does
+## Features
 
-| Step | Action |
+| Feature | Description |
 |---|---|
-| 1. Register | Link a Strapi article to a Smartcat project using their IDs |
-| 2. Send | Push `title`, `shortDescription`, and `body` to Smartcat in one click |
-| 3. Monitor | See per-language translation progress live (TR 28%, ES 100%, RU 2%) |
-| 4. Pull | Import completed translations back into Strapi as locale versions |
+| **Multi-article registry** | Register any Strapi article against any Smartcat project using their IDs |
+| **Send to Smartcat** | Push `title`, `shortDescription`, `body` to Smartcat in one click |
+| **Diff view** | Shows field-level changes since last send before pushing |
+| **Pull to Strapi** | Import completed (or partial) translations back to Strapi locale versions |
+| **XLIFF 1.2 support** | Download/upload `.xlf` files per locale — compatible with MemoQ, Trados, OmegaT, Phrase |
+| **Locale matrix view** | Table of articles × locales showing progress at a glance |
+| **Locale parity check** | Detects mismatches between Strapi and Smartcat locales |
+| **Initialize locales** | Copy source content into empty Strapi locale entries in one click |
+| **Bulk operations** | Select multiple articles and send/pull them all at once |
+| **Activity log** | Paginated audit trail of every send, pull, XLIFF action, and locale sync |
+| **Multi-project support** | Each article is linked to its own Smartcat project independently |
+| **Credential management** | All API keys stored in browser localStorage — nothing hardcoded on server |
 
 ---
 
@@ -34,14 +45,14 @@ LocaleSync lets you register CMS articles, push content to a Smartcat translatio
 
 ```
 React Dashboard (Vite + React 18)
-         ↕  REST API calls
+         ↕  REST API
 Express Middleware (Node.js)
-         ↕                     ↕
-   Strapi CMS v5          Smartcat API v1
-   (content source)       (translation engine)
+    ↕                   ↕
+Strapi CMS v5       Smartcat API v1
+(content source)    (translation engine)
 ```
 
-The middleware is **credential-agnostic** — API keys are sent per-request as headers from the browser, stored in `localStorage`. Nothing is hardcoded on the server side.
+The Express server is **credential-agnostic** — all API keys are sent as request headers from the browser. Nothing is hardcoded on the server side, making the tool usable by anyone with their own Strapi and Smartcat accounts.
 
 ---
 
@@ -49,12 +60,14 @@ The middleware is **credential-agnostic** — API keys are sent per-request as h
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, vanilla CSS |
+| Frontend | React 18, Vite, vanilla CSS with custom properties |
 | API server | Node.js, Express |
 | CMS | Strapi v5 |
 | Translation platform | Smartcat API v1 |
+| File format | XLIFF 1.2 (zero dependencies, custom serializer/parser) |
 | Credential storage | Browser localStorage |
 | Article registry | JSON file (server-side) |
+| Activity log | JSONL append-only file |
 
 ---
 
@@ -62,29 +75,33 @@ The middleware is **credential-agnostic** — API keys are sent per-request as h
 
 ```
 localesync/
-├── frontend/                      # React + Vite dashboard
+├── frontend/
 │   └── src/
 │       ├── App.jsx
 │       ├── App.css
 │       ├── api/
-│       │   └── client.js          # API calls + credential management
+│       │   └── client.js              # All API calls + credential management
 │       └── components/
-│           ├── ArticlesPage.jsx   # Article grid
-│           ├── ArticleModal.jsx   # Register / send / pull / monitor
-│           ├── Header.jsx         # Project quick-switch
-│           ├── Settings.jsx       # Credential configuration
+│           ├── ArticlesPage.jsx       # Article grid with bulk selection
+│           ├── ArticleModal.jsx       # Register · send · pull · XLIFF · locale sync
+│           ├── DiffModal.jsx          # Field-level diff before sending
+│           ├── LocaleMatrix.jsx       # Articles × locales table
+│           ├── LocaleSyncModal.jsx    # Strapi ↔ Smartcat locale parity
+│           ├── ActivityPage.jsx       # Paginated activity timeline
+│           ├── Header.jsx
+│           ├── Settings.jsx
 │           ├── StatusBadge.jsx
 │           └── Toast.jsx
 │
-├── middleware/                    # Express API server
-│   ├── server.js                  # All endpoints — credential-agnostic
-│   ├── jobTracker.js              # Article registry (registry.json)
-│   ├── strapiClient.js            # Strapi helpers
-│   ├── smartcatClient.js          # Smartcat auth + export helpers
-│   ├── transform.js               # Field mapping + placeholder validation
-│   └── sync.js                    # Optional CLI pipeline runner
+├── middleware/
+│   ├── server.js                      # Express API — all endpoints
+│   ├── activityLog.js                 # JSONL activity logger
+│   ├── xliff.js                       # XLIFF 1.2 serializer/parser
+│   ├── transform.js                   # Field mapping + placeholder validation
+│   ├── jobTracker.js                  # Legacy CLI job state
+│   └── sync.js                        # Legacy CLI pipeline runner
 │
-└── strapi-cms/                    # Local Strapi v5 instance
+└── strapi-cms/                        # Local Strapi v5 instance
 ```
 
 ---
@@ -104,7 +121,7 @@ git clone https://github.com/bunyamingenc/Smartcat-Integration-with-Strapi-CMS.g
 cd Smartcat-Integration-with-Strapi-CMS
 ```
 
-### 2. Start the middleware server
+### 2. Start the API server
 
 ```bash
 cd middleware
@@ -133,66 +150,83 @@ npm run develop
 
 Runs at `http://localhost:1337`
 
-### 5. Configure credentials in the dashboard
+### 5. Configure credentials
 
-Open **Settings** and fill in:
+Open **Settings** in the dashboard and fill in:
 
+**Strapi:**
 | Field | Where to find it |
 |---|---|
-| Strapi URL | Your Strapi instance URL (e.g. `http://localhost:1337`) |
-| Strapi API Token | Strapi Admin → Settings → API Tokens → Create Full Access token |
-| Content Type | Plural API ID of your content type (e.g. `articles`) |
-| Source Locale | Your default language code (e.g. `en`) |
-| Smartcat Server URL | `https://smartcat.ai` or `https://eu.smartcat.ai` |
-| Smartcat Account ID | Smartcat → Settings → API |
-| Smartcat API Key | Smartcat → Settings → API → Generate key |
+| Strapi URL | Your Strapi instance URL |
+| API Token | Strapi Admin → Settings → API Tokens → Full access |
+| Content Type | Plural API ID (e.g. `articles`, `test-articles`) |
+| Source Locale | Default language code (e.g. `en`) |
+
+**Smartcat:**
+| Field | Where to find it |
+|---|---|
+| Server URL | `https://smartcat.ai` or `https://eu.smartcat.ai` |
+| Account ID | Smartcat → Settings → API |
+| API Key | Smartcat → Settings → API → Generate key |
 
 ### 6. Register your first article
 
 1. Click **+ Add Article**
-2. Paste the **Strapi document ID** — found in the article URL when editing in Strapi Admin
-3. Paste the **Smartcat project ID** — found in the project URL: `smartcat.com/projects/{PROJECT-ID}/files`
+2. Paste the **Strapi document ID** — from the article URL in Strapi Admin
+3. Paste the **Smartcat project ID** — from the project URL: `smartcat.com/projects/{ID}/files`
 4. Click **Register article** — the app validates both IDs before saving
 
-### 7. Send and pull translations
+### 7. Full workflow
 
-- Click any article card to open the detail modal
-- Click **Send to Smartcat →** to push content for translation
-- Monitor per-language progress directly in the modal
-- Click **↓ Pull to Strapi** to import completed (or partial) translations
-
----
-
-## How content is handled
-
-LocaleSync extracts three fields from Strapi:
-
-- `title` — Short text
-- `shortDescription` — Short text  
-- `body` — Long text
-
-Content is serialized as a **flat JSON file** and sent to Smartcat via `PUT /v1/document/update`. Translated content is pulled back using the Smartcat export API and written to Strapi locale versions via `PUT /api/{contentType}/{documentId}?locale={lang}`.
-
-Placeholder variables in the format `{{variable_name}}` are validated before writing back to prevent broken content.
-
----
-
-## Environment Variables
-
-Create a `.env` file in `middleware/` for the optional CLI sync script:
-
-```env
-STRAPI_URL=http://localhost:1337
-STRAPI_API_TOKEN=your-strapi-api-token
-STRAPI_CONTENT_TYPE=articles
-STRAPI_SOURCE_LOCALE=en
-SMARTCAT_SERVER=https://smartcat.ai
-SMARTCAT_ACCOUNT_ID=your-account-id
-SMARTCAT_API_KEY=your-api-key
-SMARTCAT_PROJECT_ID=your-project-id
+```
+Register article
+    ↓
+Review & Send → (diff view shows what changed)
+    ↓
+Translators work in Smartcat
+    ↓
+Monitor progress (per-locale %, live)
+    ↓
+↓ Pull to Strapi (writes translated locale versions)
 ```
 
-The dashboard uses credentials from Settings instead — the `.env` file is only needed for `sync.js`.
+---
+
+## XLIFF Workflow
+
+Each locale row in the article modal has two buttons:
+
+- **↓** — downloads a `.xlf` file ready for MemoQ, Trados, OmegaT, or Phrase
+- **↑** — uploads a translated `.xlf` file and writes it directly to Strapi
+
+This works independently of Smartcat — useful when translators prefer desktop CAT tools.
+
+---
+
+## Locale Sync
+
+The **⚙ Locale Sync** button in the article modal shows a parity report:
+
+```
+✓ In both Strapi & Smartcat:   EN  TR  ES  RU
+⚠ Strapi only:                 PT
+ℹ Smartcat only:               DE  AR
+```
+
+Actions available:
+- **Initialize empty locales** — copies source content into all empty Strapi locale entries
+- **Add article entries for existing locales** — creates article entries for Smartcat languages already added to Strapi globally
+
+> Note: Strapi v5 does not allow creating global locales via API. New languages must be added manually in Strapi Admin → Settings → Internationalization first.
+
+---
+
+## Known Limitations
+
+- **Smartcat target languages are fixed at project creation** — adding new languages to an existing Smartcat project is not supported by the API. Create a new project for additional languages.
+- **Global locale creation** — Strapi v5 restricts this to the admin panel only.
+- **File formats** — currently supports JSON and XLIFF 1.2. XLIFF 2.0 and TMX are not yet supported.
+- **Rich text blocks** — Strapi's block editor format is not supported. Use Long text fields instead.
 
 ---
 
@@ -200,26 +234,32 @@ The dashboard uses credentials from Settings instead — the `.env` file is only
 
 - [ ] Deploy to Railway + Vercel (publicly usable)
 - [ ] PostgreSQL registry (replace `registry.json`)
-- [ ] Auto-send on Strapi publish via webhook
-- [ ] XLIFF format support for richer CAT tool compatibility
-- [ ] Multi-user authentication
-- [ ] Translation memory integration
+- [ ] QA report after pull (placeholder validation, HTML tag integrity)
+- [ ] Pseudo-localization mode
+- [ ] Webhook auto-send on Strapi publish
+- [ ] XLIFF 2.0 support
+- [ ] Translation memory leverage stats
 
 ---
 
 ## Background
 
-Built as a practical localization engineering project exploring:
+Built as a practical localization engineering project to explore:
 
 - Headless CMS architecture and i18n content workflows
-- TMS (Translation Management System) API integration
+- TMS (Translation Management System) API integration patterns
 - Credential-agnostic middleware design
 - React dashboard patterns for localization tooling
+- XLIFF format implementation without external dependencies
 
-The project demonstrates the full localization pipeline: **content extraction → TMS submission → real-time monitoring → locale injection**.
+The project demonstrates the full localization pipeline: **content extraction → TMS submission → real-time monitoring → locale injection** — the same flow used in production localization engineering at scale.
 
 ---
 
+## Author
+
+**Bünyamin Genç**
+Junior Localization Engineer — Hacettepe University
 [github.com/bunyamingenc](https://github.com/bunyamingenc)
 
 ---
