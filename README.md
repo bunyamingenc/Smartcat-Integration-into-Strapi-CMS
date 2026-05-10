@@ -223,7 +223,6 @@ Actions available:
 
 ## Known Limitations
 
-- **Smartcat target languages are fixed at project creation** — adding new languages to an existing Smartcat project is not supported by the API. Create a new project for additional languages.
 - **Global locale creation** — Strapi v5 restricts this to the admin panel only.
 - **File formats** — currently supports JSON and XLIFF 1.2. XLIFF 2.0 and TMX are not yet supported.
 - **Rich text blocks** — Strapi's block editor format is not supported. Use Long text fields instead.
@@ -233,7 +232,7 @@ Actions available:
 ## Roadmap
 
 - [ ] Deploy to Railway + Vercel (publicly usable)
-- [ ] PostgreSQL registry (replace `registry.json`)
+- [ ] PostgreSQL registry
 - [ ] QA report after pull (placeholder validation, HTML tag integrity)
 - [ ] Pseudo-localization mode
 - [ ] Webhook auto-send on Strapi publish
@@ -242,24 +241,6 @@ Actions available:
 
 ---
 
-## Background
-
-Built as a practical localization engineering project to explore:
-
-- Headless CMS architecture and i18n content workflows
-- TMS (Translation Management System) API integration patterns
-- Credential-agnostic middleware design
-- React dashboard patterns for localization tooling
-- XLIFF format implementation without external dependencies
-
-The project demonstrates the full localization pipeline: **content extraction → TMS submission → real-time monitoring → locale injection** — the same flow used in production localization engineering at scale.
-
----
-
-## Author
-
-**Bünyamin Genç**
-Junior Localization Engineer — Hacettepe University
 [github.com/bunyamingenc](https://github.com/bunyamingenc)
 
 ---
