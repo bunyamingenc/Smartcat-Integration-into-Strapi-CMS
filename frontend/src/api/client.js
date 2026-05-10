@@ -27,30 +27,84 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// Health + projects
-export const getHealth   = ()      => request("/health");
-export const getProjects = ()      => request("/projects").then((r) => r.data);
+// ─── Standard endpoints ───────────────────────────────────────────────────────
 
-// Registry (article + project pairs)
-export const getRegistry     = ()    => request("/registry").then((r) => r.data);
-export const addToRegistry   = (body) => request("/registry", { method: "POST", body: JSON.stringify(body) });
-export const removeFromRegistry = (key) => request(`/registry/${encodeURIComponent(key)}`, { method: "DELETE" });
+export const getHealth          = ()      => request("/health");
+export const getProjects        = ()      => request("/projects").then((r) => r.data);
 
-// Per-entry actions
-export const sendEntry  = (key) => request(`/registry/${encodeURIComponent(key)}/send`, { method: "POST" });
-export const pullEntry  = (key) => request(`/registry/${encodeURIComponent(key)}/pull`, { method: "POST" });
+export const getRegistry        = ()      => request("/registry").then((r) => r.data);
+export const addToRegistry      = (body)  => request("/registry", { method: "POST", body: JSON.stringify(body) });
+export const removeFromRegistry = (key)   => request(`/registry/${encodeURIComponent(key)}`, { method: "DELETE" });
 
-// Settings
+export const sendEntry          = (key)   => request(`/registry/${encodeURIComponent(key)}/send`, { method: "POST" });
+export const pullEntry          = (key)   => request(`/registry/${encodeURIComponent(key)}/pull`, { method: "POST" });
+
+// ─── Locale parity / initialization ───────────────────────────────────────────
+
+export const getLocales         = (key)   => request(`/registry/${encodeURIComponent(key)}/locales`);
+export const initLocales        = (key, body = {}) => request(`/registry/${encodeURIComponent(key)}/init-locales`, { method: "POST", body: JSON.stringify(body) });
+export const addStrapiLocales   = (key)   => request(`/registry/${encodeURIComponent(key)}/add-strapi-locales`, { method: "POST" });
+
+// ─── Activity log ─────────────────────────────────────────────────────────────
+
+export const getActivity   = (page = 1, limit = 25) => request(`/activity?page=${page}&limit=${limit}`);
+export const clearActivity = ()                      => request("/activity", { method: "DELETE" });
+
+// ─── XLIFF download ───────────────────────────────────────────────────────────
+
+export async function downloadXliff(key, lang) {
+  const res = await fetch(`${BASE}/registry/${encodeURIComponent(key)}/xliff?lang=${encodeURIComponent(lang)}`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || "Download failed");
+  }
+
+  // Try to use server-supplied filename
+  const disp     = res.headers.get("Content-Disposition") || "";
+  const match    = disp.match(/filename="?([^"]+)"?/);
+  const filename = match ? match[1] : `translation.${lang}.xlf`;
+
+  const xml  = await res.text();
+  const blob = new Blob([xml], { type: "application/xliff+xml" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  return { filename };
+}
+
+// ─── XLIFF upload ─────────────────────────────────────────────────────────────
+
+export async function uploadXliff(key, lang, xmlText) {
+  const headers = getHeaders();
+  headers["Content-Type"] = "application/xliff+xml";
+
+  const res = await fetch(`${BASE}/registry/${encodeURIComponent(key)}/xliff?lang=${encodeURIComponent(lang)}`, {
+    method:  "POST",
+    headers,
+    body:    xmlText,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || "Upload failed");
+  }
+  return res.json();
+}
+
+// ─── Settings helpers ─────────────────────────────────────────────────────────
+
 export function getSettings()          { return JSON.parse(localStorage.getItem("localesync_settings") || "{}"); }
 export function saveSettings(s)        { localStorage.setItem("localesync_settings", JSON.stringify(s)); }
 export function hasSettings() {
   const s = getSettings();
   return !!(s.strapiUrl && s.strapiToken && s.scServer && s.scAccount && s.scKey);
 }
-
-// Projects list in settings
 export function getSavedProjects()     { return getSettings().scProjects || []; }
 export function getActiveProjectId()   { const s = getSettings(); return s.activeProjectId || s.scProjects?.[0]?.id || ""; }
-export function setActiveProject(id)   {
-  const s = getSettings(); s.activeProjectId = id; saveSettings(s);
-}
+export function setActiveProject(id)   { const s = getSettings(); s.activeProjectId = id; saveSettings(s); }

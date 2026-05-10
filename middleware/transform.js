@@ -1,6 +1,10 @@
 // transform.js
 // Converts between Strapi content format and Smartcat flat payload format
 
+// Re-export XLIFF helpers so callers can keep a single import surface
+// (e.g. `import { toXliff, fromXliff } from "./transform.js"`).
+export { toXliff, fromXliff } from "./xliff.js";
+
 /**
  * Convert extracted Strapi fields into a flat Smartcat-ready payload.
  * Input:  { "article-804.title": "...", "article-804.body": "..." }
@@ -79,9 +83,9 @@ export function validatePlaceholders(original, translated) {
 
   if (warnings.length > 0) {
     console.warn("[transform] Placeholder validation warnings:");
-    warnings.forEach((w) => console.warn(`  ⚠  ${w}`));
+    warnings.forEach((w) => console.warn(`  !  ${w}`));
   } else {
-    console.log("[transform] Placeholder validation passed ✓");
+    console.log("[transform] Placeholder validation passed");
   }
 
   return warnings;

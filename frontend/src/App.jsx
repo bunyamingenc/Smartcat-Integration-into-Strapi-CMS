@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import ArticlesPage from "./components/ArticlesPage";
 import Header       from "./components/Header";
 import Settings     from "./components/Settings";
+import ActivityPage from "./components/ActivityPage";
 import { ToastProvider } from "./components/Toast";
 import { getRegistry, getHealth, hasSettings } from "./api/client";
 import "./App.css";
@@ -57,7 +58,8 @@ export default function App() {
                   <button className="btn btn-primary" onClick={() => setView("settings")}>Go to Settings ⚙</button>
                 </div>
           )}
-          {view === "settings" && <Settings onSaved={handleSettingsSaved} />}
+          {view === "settings"  && <Settings onSaved={handleSettingsSaved} />}
+          {view === "activity"  && <ActivityPage />}
         </main>
       </div>
     </ToastProvider>

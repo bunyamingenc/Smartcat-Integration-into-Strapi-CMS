@@ -12,7 +12,7 @@ const MAP = {
   synced:      { label: "Synced ✓",    cls: "badge-green"  },
   timeout:     { label: "Timed out",   cls: "badge-red"    },
   error:       { label: "Error",       cls: "badge-red"    },
-  unknown:     { label: "Unknown",     cls: "badge-gray"   },
+  no_doc:      { label: "No document",  cls: "badge-gray"   },
 };
 export default function StatusBadge({ status }) {
   const key = (status || "not_started").toLowerCase().replace(/[\s-]/g, "_");

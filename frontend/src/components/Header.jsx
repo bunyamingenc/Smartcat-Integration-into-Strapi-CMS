@@ -40,7 +40,7 @@ export default function Header({ health, view, onNav, unconfigured, onProjectSwi
       </div>
 
       <nav className="header-nav">
-        {["articles", "settings"].map((v) => (
+        {["articles", "activity", "settings"].map((v) => (
           <button
             key={v}
             className={`nav-btn ${view === v ? "active" : ""} ${v === "settings" && unconfigured ? "nav-btn-warn" : ""}`}
