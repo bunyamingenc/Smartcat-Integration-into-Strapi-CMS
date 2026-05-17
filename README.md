@@ -1,6 +1,6 @@
 # LocaleSync
 
-**A translation management dashboard connecting Strapi CMS with Smartcat — built for localization engineers.**
+**A translation management dashboard connecting Strapi CMS with Smartcat**
 
 LocaleSync bridges the gap between headless CMS content and professional TMS workflows. Register articles, push content to Smartcat, monitor per-language translation progress in real time, and pull completed translations back into Strapi — all from a single dashboard, with no manual copy-paste.
 
