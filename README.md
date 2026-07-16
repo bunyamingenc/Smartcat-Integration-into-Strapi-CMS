@@ -30,6 +30,7 @@ LocaleSync bridges the gap between headless CMS content and professional TMS wor
 | **Send to Smartcat** | Push `title`, `shortDescription`, `body` to Smartcat in one click |
 | **Diff view** | Shows field-level changes since last send before pushing |
 | **Pull to Strapi** | Import completed (or partial) translations back to Strapi locale versions |
+| **QA report** | Validates pulled translations — placeholder integrity, HTML tag balance, empty fields, length anomalies |
 | **XLIFF 1.2 support** | Download/upload `.xlf` files per locale — compatible with MemoQ, Trados, OmegaT, Phrase |
 | **Locale matrix view** | Table of articles × locales showing progress at a glance |
 | **Locale parity check** | Detects mismatches between Strapi and Smartcat locales |
@@ -38,6 +39,7 @@ LocaleSync bridges the gap between headless CMS content and professional TMS wor
 | **Activity log** | Paginated audit trail of every send, pull, XLIFF action, and locale sync |
 | **Multi-project support** | Each article is linked to its own Smartcat project independently |
 | **Credential management** | All API keys stored in browser localStorage — nothing hardcoded on server |
+| **Keyboard shortcuts** | `Cmd/Ctrl+K` to add an article, `Esc` to close modals, `R` to refresh |
 
 ---
 
@@ -81,13 +83,17 @@ localesync/
 │       ├── App.css
 │       ├── api/
 │       │   └── client.js              # All API calls + credential management
+│       ├── hooks/
+│       │   └── useKeyboardShortcuts.js
 │       └── components/
 │           ├── ArticlesPage.jsx       # Article grid with bulk selection
 │           ├── ArticleModal.jsx       # Register · send · pull · XLIFF · locale sync
 │           ├── DiffModal.jsx          # Field-level diff before sending
+│           ├── QAReportModal.jsx      # Translation quality report after pull
 │           ├── LocaleMatrix.jsx       # Articles × locales table
 │           ├── LocaleSyncModal.jsx    # Strapi ↔ Smartcat locale parity
 │           ├── ActivityPage.jsx       # Paginated activity timeline
+│           ├── Skeleton.jsx           # Loading placeholders
 │           ├── Header.jsx
 │           ├── Settings.jsx
 │           ├── StatusBadge.jsx
@@ -96,6 +102,7 @@ localesync/
 ├── middleware/
 │   ├── server.js                      # Express API — all endpoints
 │   ├── activityLog.js                 # JSONL activity logger
+│   ├── qaCheck.js                     # Translation QA validation
 │   ├── xliff.js                       # XLIFF 1.2 serializer/parser
 │   ├── transform.js                   # Field mapping + placeholder validation
 │   ├── jobTracker.js                  # Legacy CLI job state
@@ -187,7 +194,7 @@ Translators work in Smartcat
     ↓
 Monitor progress (per-locale %, live)
     ↓
-↓ Pull to Strapi (writes translated locale versions)
+↓ Pull to Strapi (writes translated locale versions + runs QA checks)
 ```
 
 ---
@@ -200,6 +207,21 @@ Each locale row in the article modal has two buttons:
 - **↑** — uploads a translated `.xlf` file and writes it directly to Strapi
 
 This works independently of Smartcat — useful when translators prefer desktop CAT tools.
+
+---
+
+## QA Report
+
+After every **Pull**, LocaleSync automatically validates the translated content against the source and flags:
+
+| Check | Severity | What it catches |
+|---|---|---|
+| Placeholder mismatch | 🔴 Error | `{{variable}}` missing or altered in translation |
+| Empty translation | 🔴 Error | Field came back blank |
+| HTML tag mismatch | 🟡 Warning | Tag count differs from source (e.g. missing `<b>`) |
+| Length anomaly | 🟡 Warning | Translation is unusually long or short vs. source |
+
+A report modal opens automatically after each pull, with a per-language breakdown. The last report is also saved and viewable anytime from the article modal.
 
 ---
 
@@ -233,7 +255,7 @@ Actions available:
 
 - [ ] Deploy to Railway + Vercel (publicly usable)
 - [ ] PostgreSQL registry
-- [ ] QA report after pull (placeholder validation, HTML tag integrity)
+- [x] QA report after pull (placeholder validation, HTML tag integrity)
 - [ ] Pseudo-localization mode
 - [ ] Webhook auto-send on Strapi publish
 - [ ] XLIFF 2.0 support
