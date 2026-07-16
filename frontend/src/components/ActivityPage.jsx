@@ -1,6 +1,7 @@
 // src/components/ActivityPage.jsx
 import { useState, useEffect, useCallback } from "react";
 import { getActivity, clearActivity } from "../api/client";
+import { ActivityListSkeleton } from "./Skeleton";
 import { useToast } from "./Toast";
 
 const ACTION_LABELS = {
@@ -122,17 +123,15 @@ export default function ActivityPage() {
         </div>
       </div>
 
-      {loading && (
-        <div className="state-container">
-          <div className="spinner" />
-          <p className="state-label">Loading activity…</p>
-        </div>
-      )}
+      {loading && <ActivityListSkeleton count={5} />}
 
       {!loading && data?.total === 0 && (
-        <div className="state-container">
-          <p className="state-label">No activity yet.</p>
-          <p className="state-hint">Actions like Send, Pull, and XLIFF downloads will appear here.</p>
+        <div className="empty-state">
+          <div className="empty-state-icon">🕑</div>
+          <h3 className="empty-state-title">No activity yet</h3>
+          <p className="empty-state-desc">
+            Actions like Send, Pull, and XLIFF downloads will appear here as you use the app.
+          </p>
         </div>
       )}
 

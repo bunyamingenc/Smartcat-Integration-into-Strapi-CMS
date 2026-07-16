@@ -724,3 +724,191 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
   color: var(--text-sub);
   font-family: var(--mono);
 }
+
+/* ── QA Report ───────────────────────────────────────── */
+.btn-qa-error {
+  color: var(--red) !important;
+  border-color: rgba(248,113,113,0.35) !important;
+}
+.btn-qa-warning {
+  color: var(--yellow) !important;
+  border-color: rgba(245,200,66,0.35) !important;
+}
+
+.qa-summary-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+}
+.qa-summary-pass {
+  background: rgba(62,207,142,0.08);
+  border-color: rgba(62,207,142,0.25);
+  color: var(--green);
+}
+.qa-summary-issues {
+  background: rgba(245,200,66,0.08);
+  border-color: rgba(245,200,66,0.25);
+  color: var(--text);
+}
+.qa-summary-icon { font-size: 1.2rem; flex-shrink: 0; }
+.qa-summary-issues .qa-summary-icon { color: var(--yellow); }
+
+.qa-lang-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.qa-lang-section {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+.qa-lang-clean { opacity: 0.75; }
+
+.qa-lang-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+.qa-lang-status { display: flex; gap: 0.4rem; align-items: center; font-size: 0.8rem; }
+.qa-status-pass { color: var(--green); font-weight: 600; }
+
+.qa-count {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+.qa-count-error   { background: rgba(248,113,113,0.15); color: var(--red); }
+.qa-count-warning { background: rgba(245,200,66,0.15); color: var(--yellow); }
+
+.qa-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+.qa-field-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+}
+.qa-field-name {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.qa-issue-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.qa-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.qa-issue-icon { flex-shrink: 0; }
+.qa-issue-error   .qa-issue-message { color: var(--red); }
+.qa-issue-warning .qa-issue-message { color: var(--yellow); }
+
+.qa-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.qa-legend-item { white-space: nowrap; }
+
+/* ── Skeleton loaders ────────────────────────────────── */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+.skel {
+  background: var(--surface2);
+  border-radius: 4px;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+.skeleton-card { pointer-events: none; }
+.skel-badge  { width: 60px;  height: 20px; border-radius: 20px; }
+.skel-tag    { width: 90px;  height: 20px; border-radius: 4px; }
+.skel-title  { width: 75%;   height: 20px; margin-top: 0.4rem; }
+.skel-desc   { width: 95%;   height: 13px; margin-top: 0.3rem; }
+.skel-code   { width: 28px;  height: 12px; }
+.skel-bar    { flex: 1;      height: 4px; }
+.skel-pct    { width: 30px;  height: 12px; }
+.skel-dot    { width: 14px;  height: 14px; border-radius: 50%; margin-top: 3px; }
+.skel-label  { width: 140px; height: 14px; }
+.skel-article-title { width: 200px; height: 16px; margin-top: 0.35rem; }
+
+/* ── Empty states ────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 4.5rem 2rem;
+  text-align: center;
+}
+.empty-state-icon {
+  font-size: 2.6rem;
+  opacity: 0.6;
+  margin-bottom: 0.4rem;
+  filter: grayscale(0.3);
+}
+.empty-state-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.empty-state-desc {
+  font-size: 0.88rem;
+  color: var(--text-sub);
+  max-width: 380px;
+  line-height: 1.55;
+  margin-bottom: 0.5rem;
+}
+.empty-state-shortcut {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-top: 0.6rem;
+}
+kbd {
+  display: inline-block;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-sub);
+}
+
+/* ── Toast exit animation ────────────────────────────── */
+.toast-leaving {
+  animation: toastOut 0.18s ease forwards;
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateX(20px); }
+}

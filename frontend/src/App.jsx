@@ -53,9 +53,13 @@ export default function App() {
           {view === "articles" && (
             configured
               ? <ArticlesPage entries={entries} loading={loading} onRefresh={loadEntries} />
-              : <div className="state-container">
-                  <p className="state-label">Configure your credentials in Settings to get started.</p>
-                  <button className="btn btn-primary" onClick={() => setView("settings")}>Go to Settings ⚙</button>
+              : <div className="empty-state">
+                  <div className="empty-state-icon">⚙</div>
+                  <h3 className="empty-state-title">Let's get you connected</h3>
+                  <p className="empty-state-desc">
+                    Add your Strapi and Smartcat credentials to start syncing translations.
+                  </p>
+                  <button className="btn btn-primary" onClick={() => setView("settings")}>Go to Settings →</button>
                 </div>
           )}
           {view === "settings"  && <Settings onSaved={handleSettingsSaved} />}

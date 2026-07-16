@@ -3,6 +3,8 @@ import { useState, useCallback } from "react";
 import StatusBadge from "./StatusBadge";
 import { AddArticleModal, ArticleDetailModal } from "./ArticleModal";
 import LocaleMatrix from "./LocaleMatrix";
+import { ArticleGridSkeleton, MatrixSkeleton } from "./Skeleton";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { sendEntry, pullEntry } from "../api/client";
 import { useToast } from "./Toast";
 
@@ -13,6 +15,16 @@ export default function ArticlesPage({ entries, loading, onRefresh }) {
   const [bulkStatus, setBulkStatus] = useState(null);
   const [viewMode,   setViewMode]   = useState("cards"); // "cards" | "matrix"
   const { add: toast } = useToast();
+
+  // ─── Keyboard shortcuts ─────────────────────────────────────────────────────
+  useKeyboardShortcuts({
+    onAddArticle: () => setShowAdd(true),
+    onEscape: () => {
+      if (selected)  { setSelected(null); return; }
+      if (showAdd)   { setShowAdd(false); return; }
+    },
+    onRefresh: () => { if (bulkStatus === null) onRefresh(); },
+  });
 
   // ─── Selection helpers ──────────────────────────────────────────────────────
 
@@ -178,17 +190,20 @@ export default function ArticlesPage({ entries, loading, onRefresh }) {
 
       {/* ── States ── */}
       {loading && (
-        <div className="state-container">
-          <div className="spinner" />
-          <p className="state-label">Loading registered articles…</p>
-        </div>
+        viewMode === "matrix" ? <MatrixSkeleton /> : <ArticleGridSkeleton count={3} />
       )}
 
       {!loading && entries.length === 0 && (
-        <div className="state-container">
-          <p className="state-label">No articles registered yet.</p>
-          <p className="state-hint">Click "+ Add Article" to link a Strapi article to a Smartcat project.</p>
+        <div className="empty-state">
+          <div className="empty-state-icon">📭</div>
+          <h3 className="empty-state-title">No articles registered yet</h3>
+          <p className="empty-state-desc">
+            Link a Strapi article to a Smartcat project to start tracking translations.
+          </p>
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Add Article</button>
+          <p className="empty-state-shortcut">
+            or press <kbd>{navigator.platform.includes("Mac") ? "⌘" : "Ctrl"}</kbd>+<kbd>K</kbd>
+          </p>
         </div>
       )}
 

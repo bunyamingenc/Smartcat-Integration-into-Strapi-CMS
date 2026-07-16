@@ -12,6 +12,7 @@ import fs      from "fs";
 import path    from "path";
 import { toXliff, fromXliff } from "./xliff.js";
 import { logActivity, readActivity, clearActivity } from "./activityLog.js";
+import { runQA } from "./qaCheck.js";
 
 const app      = express();
 const PORT     = 3000;
@@ -394,7 +395,8 @@ app.post("/api/registry/:key/pull", async (req, res) => {
   }
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const results = {};
+  const results  = {};
+  const qaByLang = {};
 
   for (const [lang, docId] of Object.entries(entry.smartcatDocumentIds)) {
     if (!docId) { results[lang] = { status: "failed", reason: "no document ID" }; continue; }
@@ -414,17 +416,37 @@ app.post("/api/registry/:key/pull", async (req, res) => {
       const fields = {};
       for (const [k, v] of Object.entries(translated)) fields[k.substring(k.indexOf(".") + 1)] = v;
 
+      // Run QA checks against the source content we originally sent
+      const sourceFields = entry.lastSentSnapshot || {};
+      const qa = runQA(sourceFields, fields);
+      qaByLang[lang] = qa;
+
       await c.strapi.put(`/api/${c.strapiType}/${entry.strapiDocumentId}?locale=${lang}`, { data: fields });
-      results[lang] = { status: "synced", fields: Object.keys(fields) };
+      results[lang] = { status: "synced", fields: Object.keys(fields), qa };
     } catch (e) { results[lang] = { status: "failed", reason: e.message }; }
   }
 
   const allSynced = Object.values(results).every((r) => r.status === "synced");
-  reg[key].status = allSynced ? "synced" : "partial";
+
+  // Aggregate QA summary across all languages
+  const totalErrors   = Object.values(qaByLang).reduce((s, q) => s + (q?.errorCount ?? 0), 0);
+  const totalWarnings = Object.values(qaByLang).reduce((s, q) => s + (q?.warningCount ?? 0), 0);
+  const qaReport = {
+    byLang:       qaByLang,
+    totalErrors,
+    totalWarnings,
+    checkedAt:    new Date().toISOString(),
+  };
+
+  reg[key].status    = allSynced ? "synced" : "partial";
   reg[key].updatedAt = new Date().toISOString();
+  reg[key].lastQaReport = qaReport;
   saveRegistry(reg);
-  logActivity("pull", { articleTitle: entry.title, key, results, allSynced });
-  res.json({ key, results });
+  logActivity("pull", {
+    articleTitle: entry.title, key, results, allSynced,
+    qaErrors: totalErrors, qaWarnings: totalWarnings,
+  });
+  res.json({ key, results, qaReport });
 });
 
 // ─── XLIFF download ──────────────────────────────────────────────────────────

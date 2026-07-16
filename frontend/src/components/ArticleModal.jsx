@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import StatusBadge from "./StatusBadge";
 import DiffModal   from "./DiffModal";
 import LocaleSyncModal from "./LocaleSyncModal";
+import QAReportModal from "./QAReportModal";
 import {
   sendEntry, pullEntry, removeFromRegistry, addToRegistry,
   getActiveProjectId, downloadXliff, uploadXliff,
@@ -87,6 +88,7 @@ export function ArticleDetailModal({ entry, onClose, onRefresh }) {
   const [removing, setRemoving]  = useState(false);
   const [showDiff, setShowDiff]  = useState(false);
   const [showLocaleSync, setShowLocaleSync] = useState(false);
+  const [qaReport, setQaReport]  = useState(null); // set after pull, opens QA modal
   const [busyLang, setBusyLang]  = useState({});  // { tr: "downloading" | "uploading" }
   const fileInputs               = useRef({});    // hidden file inputs per lang
   const { add: toast }           = useToast();
@@ -120,6 +122,11 @@ export function ArticleDetailModal({ entry, onClose, onRefresh }) {
       const allOk  = Object.values(result.results).every((r) => r.status === "synced");
       toast(allOk ? "All translations synced ✓" : "Some translations failed — check status", allOk ? "success" : "warning");
       onRefresh();
+
+      // Show QA report if we have one, regardless of sync success
+      if (result.qaReport) {
+        setQaReport(result.qaReport);
+      }
     } catch (e) { toast(e.message, "error"); }
     finally { setPulling(false); }
   }
@@ -282,6 +289,19 @@ export function ArticleDetailModal({ entry, onClose, onRefresh }) {
               {removing ? "Removing…" : "Remove"}
             </button>
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {entry.lastQaReport && (
+                <button
+                  className={`btn btn-ghost ${entry.lastQaReport.totalErrors > 0 ? "btn-qa-error" : entry.lastQaReport.totalWarnings > 0 ? "btn-qa-warning" : ""}`}
+                  onClick={() => setQaReport(entry.lastQaReport)}
+                  title="View last QA report"
+                >
+                  {entry.lastQaReport.totalErrors > 0
+                    ? `⚠ QA: ${entry.lastQaReport.totalErrors} error${entry.lastQaReport.totalErrors !== 1 ? "s" : ""}`
+                    : entry.lastQaReport.totalWarnings > 0
+                    ? `⚠ QA: ${entry.lastQaReport.totalWarnings} warning${entry.lastQaReport.totalWarnings !== 1 ? "s" : ""}`
+                    : "✓ QA passed"}
+                </button>
+              )}
               <button className="btn btn-ghost" onClick={() => setShowLocaleSync(true)}>
                 ⚙ Locale Sync
               </button>
@@ -313,6 +333,14 @@ export function ArticleDetailModal({ entry, onClose, onRefresh }) {
           entry={entry}
           onClose={() => setShowLocaleSync(false)}
           onRefresh={onRefresh}
+        />
+      )}
+
+      {qaReport && (
+        <QAReportModal
+          report={qaReport}
+          articleTitle={entry.title}
+          onClose={() => setQaReport(null)}
         />
       )}
     </>
