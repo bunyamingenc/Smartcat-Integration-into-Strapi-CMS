@@ -8,15 +8,13 @@ dotenv.config();
 import express from "express";
 import cors    from "cors";
 import axios   from "axios";
-import fs      from "fs";
-import path    from "path";
 import { toXliff, toXliff2, fromXliffAny } from "./xliff.js";
 import { logActivity, readActivity, clearActivity } from "./activityLog.js";
 import { runQA } from "./qaCheck.js";
+import { loadRegistry, saveRegistry } from "./db.js";
 
 const app      = express();
 const PORT     = 3000;
-const REG_FILE = path.resolve("registry.json");
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 // In development, allow localhost on any port (Vite's dev server port can vary).
@@ -51,12 +49,7 @@ app.use(express.json({ limit: "5mb" }));
 app.use(express.text({ type: ["application/xliff+xml", "application/xml", "text/xml", "text/plain"], limit: "5mb" }));
 
 // ─── Registry ────────────────────────────────────────────────────────────────
-
-function loadRegistry() {
-  if (!fs.existsSync(REG_FILE)) return {};
-  try { return JSON.parse(fs.readFileSync(REG_FILE, "utf-8")); } catch { return {}; }
-}
-function saveRegistry(reg) { fs.writeFileSync(REG_FILE, JSON.stringify(reg, null, 2), "utf-8"); }
+// loadRegistry / saveRegistry are imported from db.js (SQLite-backed).
 
 // ─── Credentials ─────────────────────────────────────────────────────────────
 
