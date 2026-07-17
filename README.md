@@ -28,10 +28,11 @@ LocaleSync bridges the gap between headless CMS content and professional TMS wor
 |---|---|
 | **Multi-article registry** | Register any Strapi article against any Smartcat project using their IDs |
 | **Send to Smartcat** | Push `title`, `shortDescription`, `body` to Smartcat in one click |
+| **Webhook auto-send** | Optionally trigger a send automatically when an article is published in Strapi |
 | **Diff view** | Shows field-level changes since last send before pushing |
 | **Pull to Strapi** | Import completed (or partial) translations back to Strapi locale versions |
 | **QA report** | Validates pulled translations — placeholder integrity, HTML tag balance, empty fields, length anomalies |
-| **XLIFF 1.2 support** | Download/upload `.xlf` files per locale — compatible with MemoQ, Trados, OmegaT, Phrase |
+| **XLIFF 1.2 & 2.0 support** | Download/upload `.xlf` files per locale — compatible with MemoQ, Trados, OmegaT, Phrase. Uploads auto-detect version |
 | **Locale matrix view** | Table of articles × locales showing progress at a glance |
 | **Locale parity check** | Detects mismatches between Strapi and Smartcat locales |
 | **Initialize locales** | Copy source content into empty Strapi locale entries in one click |
@@ -54,7 +55,7 @@ Strapi CMS v5       Smartcat API v1
 (content source)    (translation engine)
 ```
 
-The Express server is **credential-agnostic** — all API keys are sent as request headers from the browser. Nothing is hardcoded on the server side, making the tool usable by anyone with their own Strapi and Smartcat accounts.
+The Express server is **credential-agnostic** — all API keys are sent as request headers from the browser. Nothing is hardcoded on the server side, making the tool usable by anyone with their own Strapi and Smartcat accounts. The one exception is the optional webhook auto-send feature, which reads a small set of environment variables since Strapi's webhook call has no browser session to pull credentials from.
 
 ---
 
@@ -66,10 +67,10 @@ The Express server is **credential-agnostic** — all API keys are sent as reque
 | API server | Node.js, Express |
 | CMS | Strapi v5 |
 | Translation platform | Smartcat API v1 |
-| File format | XLIFF 1.2 (zero dependencies, custom serializer/parser) |
+| File formats | XLIFF 1.2 and 2.0 (zero dependencies, custom serializer/parser) |
 | Credential storage | Browser localStorage |
-| Article registry | JSON file (server-side) |
-| Activity log | JSONL append-only file |
+| Article registry | SQLite (better-sqlite3) |
+| Activity log | SQLite (same database) |
 
 ---
 
@@ -101,9 +102,11 @@ localesync/
 │
 ├── middleware/
 │   ├── server.js                      # Express API — all endpoints
-│   ├── activityLog.js                 # JSONL activity logger
+│   ├── db.js                          # SQLite connection + registry storage
+│   ├── activityLog.js                 # SQLite-backed activity logger
 │   ├── qaCheck.js                     # Translation QA validation
-│   ├── xliff.js                       # XLIFF 1.2 serializer/parser
+│   ├── xliff.js                       # XLIFF 1.2 & 2.0 serializer/parser
+│   ├── migrate.js                     # One-time file → SQLite migration
 │   ├── transform.js                   # Field mapping + placeholder validation
 │   ├── jobTracker.js                  # Legacy CLI job state
 │   └── sync.js                        # Legacy CLI pipeline runner
@@ -136,7 +139,7 @@ npm install
 node server.js
 ```
 
-Runs at `http://localhost:3000`
+Runs at `http://localhost:3000`. A `data.sqlite` file is created automatically on first run.
 
 ### 3. Start the frontend
 
@@ -176,6 +179,8 @@ Open **Settings** in the dashboard and fill in:
 | Account ID | Smartcat → Settings → API |
 | API Key | Smartcat → Settings → API → Generate key |
 
+**XLIFF version** (optional): choose 1.2 (default) or 2.0 for downloads — uploads work with either automatically.
+
 ### 6. Register your first article
 
 1. Click **+ Add Article**
@@ -203,10 +208,24 @@ Monitor progress (per-locale %, live)
 
 Each locale row in the article modal has two buttons:
 
-- **↓** — downloads a `.xlf` file ready for MemoQ, Trados, OmegaT, or Phrase
-- **↑** — uploads a translated `.xlf` file and writes it directly to Strapi
+- **↓** — downloads a `.xlf` file in your preferred version (1.2 or 2.0, set in Settings), ready for MemoQ, Trados, OmegaT, or Phrase
+- **↑** — uploads a translated `.xlf` file and writes it directly to Strapi. Version is auto-detected — either format works without configuration
 
 This works independently of Smartcat — useful when translators prefer desktop CAT tools.
+
+---
+
+## Webhook Auto-Send
+
+Strapi can automatically notify LocaleSync when an article is published, triggering an immediate send to Smartcat with no manual click needed.
+
+**Setup:**
+1. Set these environment variables on the middleware server: `STRAPI_URL`, `STRAPI_API_TOKEN`, `STRAPI_CONTENT_TYPE`, `STRAPI_SOURCE_LOCALE`, `SMARTCAT_SERVER`, `SMARTCAT_ACCOUNT_ID`, `SMARTCAT_API_KEY`
+2. In Strapi Admin → Settings → Webhooks → Create new
+3. URL: `https://your-middleware-url/webhook/strapi`
+4. Event: `entry.publish`
+
+Only articles already registered in LocaleSync are auto-sent — publishing an unregistered article is a no-op.
 
 ---
 
@@ -221,7 +240,7 @@ After every **Pull**, LocaleSync automatically validates the translated content 
 | HTML tag mismatch | 🟡 Warning | Tag count differs from source (e.g. missing `<b>`) |
 | Length anomaly | 🟡 Warning | Translation is unusually long or short vs. source |
 
-A report modal opens automatically after each pull, with a per-language breakdown. The last report is also saved and viewable anytime from the article modal.
+A report modal opens automatically after each pull, with a collapsible per-language breakdown so you can focus on one problem area at a time. The last report is also saved and viewable anytime from the article modal.
 
 ---
 
@@ -246,20 +265,20 @@ Actions available:
 ## Known Limitations
 
 - **Global locale creation** — Strapi v5 restricts this to the admin panel only.
-- **File formats** — currently supports JSON and XLIFF 1.2. XLIFF 2.0 and TMX are not yet supported.
+- **File formats** — supports JSON, XLIFF 1.2, and XLIFF 2.0. TMX is not yet supported.
 - **Rich text blocks** — Strapi's block editor format is not supported. Use Long text fields instead.
+- **Smartcat target languages** — fixed at project creation; the API doesn't support adding languages to an existing project.
 
 ---
 
 ## Roadmap
 
 - [ ] Deploy to Railway + Vercel (publicly usable)
-- [ ] PostgreSQL registry
+- [x] SQLite registry
 - [x] QA report after pull (placeholder validation, HTML tag integrity)
 - [ ] Pseudo-localization mode
-- [ ] Webhook auto-send on Strapi publish
-- [ ] XLIFF 2.0 support
-- [ ] Translation memory leverage stats
+- [x] Webhook auto-send on Strapi publish
+- [x] XLIFF 2.0 support
 
 ---
 
