@@ -1,5 +1,5 @@
 // src/api/client.js
-const BASE = import.meta.env.VITE_API_BASE || "http://localhost:3000/api";
+const BASE = "http://localhost:3000/api";
 
 function getHeaders() {
   const s = JSON.parse(localStorage.getItem("localesync_settings") || "{}");
@@ -12,6 +12,7 @@ function getHeaders() {
     "x-sc-server":     s.scServer     || "",
     "x-sc-account":    s.scAccount    || "",
     "x-sc-key":        s.scKey        || "",
+    "x-xliff-version": s.xliffVersion || "1.2",
   };
 }
 

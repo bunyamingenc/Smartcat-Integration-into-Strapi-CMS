@@ -138,6 +138,31 @@ export default function Settings({ onSaved }) {
         </div>
       </div>
 
+      {/* XLIFF download preference */}
+      <div className="settings-card settings-card-full" style={{ marginBottom: "1.25rem" }}>
+        <h3 className="settings-section-title">XLIFF</h3>
+        <p className="settings-card-desc" style={{ marginBottom: "1rem" }}>
+          Which XLIFF version to use when you click the <strong>↓</strong> download button in an article.
+          Uploads (<strong>↑</strong>) auto-detect the version, so this only affects downloads.
+        </p>
+        <div className="xliff-version-toggle">
+          <button
+            className={`xliff-version-btn ${(form.xliffVersion || "1.2") === "1.2" ? "active" : ""}`}
+            onClick={() => setForm((f) => ({ ...f, xliffVersion: "1.2" }))}
+          >
+            XLIFF 1.2
+            <span className="xliff-version-hint">MemoQ, Trados, OmegaT, Phrase</span>
+          </button>
+          <button
+            className={`xliff-version-btn ${form.xliffVersion === "2.0" ? "active" : ""}`}
+            onClick={() => setForm((f) => ({ ...f, xliffVersion: "2.0" }))}
+          >
+            XLIFF 2.0
+            <span className="xliff-version-hint">Newer tools, cleaner structure</span>
+          </button>
+        </div>
+      </div>
+
       <div className="settings-note">
         <span className="settings-note-icon">🔒</span>
         Credentials stored in localStorage and sent as request headers to the local API server only.

@@ -10,7 +10,7 @@ import cors    from "cors";
 import axios   from "axios";
 import fs      from "fs";
 import path    from "path";
-import { toXliff, fromXliff } from "./xliff.js";
+import { toXliff, toXliff2, fromXliffAny } from "./xliff.js";
 import { logActivity, readActivity, clearActivity } from "./activityLog.js";
 import { runQA } from "./qaCheck.js";
 
@@ -18,7 +18,34 @@ const app      = express();
 const PORT     = 3000;
 const REG_FILE = path.resolve("registry.json");
 
-app.use(cors());
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+// In development, allow localhost on any port (Vite's dev server port can vary).
+// In production, only allow the origin(s) listed in ALLOWED_ORIGINS (comma-separated).
+// Example: ALLOWED_ORIGINS=https://localesync.vercel.app,https://mycustomdomain.com
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // No origin = same-origin request, curl, server-to-server — allow it
+    if (!origin) return callback(null, true);
+
+    // Local development — allow any localhost/127.0.0.1 port
+    if (/^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    // Production — only explicitly allowed origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+}));
 app.use(express.json({ limit: "5mb" }));
 // Raw text body (for XLIFF uploads)
 app.use(express.text({ type: ["application/xliff+xml", "application/xml", "text/xml", "text/plain"], limit: "5mb" }));
@@ -52,6 +79,70 @@ function getCreds(req) {
 
 function noCreds(res) { return res.status(401).json({ error: "Missing credentials in Settings." }); }
 
+// ─── Env-based credentials — used only by the Strapi webhook ──────────────────
+// Webhooks have no browser/headers, so this reads a fixed set of credentials
+// from environment variables instead. Only needed if you enable webhook auto-send.
+
+function getEnvCredentials() {
+  const strapiUrl   = process.env.STRAPI_URL;
+  const strapiToken = process.env.STRAPI_API_TOKEN;
+  const strapiType  = process.env.STRAPI_CONTENT_TYPE   || "test-articles";
+  const strapiLocale= process.env.STRAPI_SOURCE_LOCALE  || "en";
+  const scServer    = process.env.SMARTCAT_SERVER;
+  const scAccount   = process.env.SMARTCAT_ACCOUNT_ID;
+  const scKey       = process.env.SMARTCAT_API_KEY;
+
+  if (!strapiUrl || !strapiToken || !scServer || !scAccount || !scKey) return null;
+
+  const scAuth = "Basic " + Buffer.from(`${scAccount}:${scKey}`).toString("base64");
+
+  return {
+    strapiType, strapiLocale, scAuth, scServer,
+    strapi: axios.create({ baseURL: strapiUrl,                     headers: { Authorization: `Bearer ${strapiToken}` } }),
+    sc:     axios.create({ baseURL: `${scServer}/api/integration`, headers: { Authorization: scAuth } }),
+  };
+}
+
+// ─── Friendly error messages ──────────────────────────────────────────────────
+// Converts raw Node/axios errors into messages a non-technical user can understand.
+// Falls back to the original message only for truly unexpected cases.
+
+function friendlyError(e) {
+  const code = e.code;
+
+  if (code === "ECONNREFUSED") {
+    return "Could not connect to Strapi. Make sure Strapi is running and the URL in Settings is correct.";
+  }
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") {
+    return "Could not resolve the server address. Check the URL in Settings.";
+  }
+  if (code === "ETIMEDOUT" || code === "ECONNABORTED") {
+    return "The request timed out. The server may be slow or unreachable.";
+  }
+
+  const status = e.response?.status;
+  if (status === 401 || status === 403) {
+    return "Authentication failed. Check your API token/key in Settings.";
+  }
+  if (status === 404) {
+    return "Not found. Check the article or project ID.";
+  }
+  if (status === 429) {
+    return "Too many requests. Please wait a moment and try again.";
+  }
+  if (status >= 500) {
+    return "The server encountered an error. Please try again in a moment.";
+  }
+
+  // Axios-specific network error with no response at all
+  if (e.message === "Network Error") {
+    return "Network error — could not reach the server. Check your connection and the URLs in Settings.";
+  }
+
+  // Fallback — still better than a raw stack trace, but keeps useful detail
+  return e.response?.data?.error?.message || e.message || "An unexpected error occurred.";
+}
+
 function makeBody(contentId, fileContent) {
   const boundary = "--------------------SmartCATe8bf0f27d7";
   const CRLF = "\r\n";
@@ -71,7 +162,7 @@ app.get("/api/health", async (req, res) => {
   try {
     await c.sc.get("/v1/account");
     res.json({ status: "ok" });
-  } catch (e) { res.status(500).json({ status: "error", message: e.message }); }
+  } catch (e) { res.status(500).json({ status: "error", message: friendlyError(e) }); }
 });
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -82,7 +173,7 @@ app.get("/api/projects", async (req, res) => {
   try {
     const r = await c.sc.get("/v1/project/list");
     res.json({ data: (r.data || []).map((p) => ({ id: p.id, name: p.name, status: p.status, languages: p.targetLanguages || [] })) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json({ error: friendlyError(e) }); }
 });
 
 // ─── Registry list ────────────────────────────────────────────────────────────
@@ -106,7 +197,7 @@ app.get("/api/registry", async (req, res) => {
         result.publishedAt      = attrs?.publishedAt ?? null;
       } catch (e) {
         result.title      = entry.title || "(could not fetch)";
-        result.fetchError = e.response?.status === 404 ? "Article not found in Strapi" : e.message;
+        result.fetchError = friendlyError(e);
       }
 
       // ── Fetch Strapi locales for THIS article ──────────────────────────────
@@ -234,14 +325,14 @@ app.post("/api/registry", async (req, res) => {
     const attrs = data?.attributes ?? data;
     title = attrs?.title || title;
   } catch (e) {
-    return res.status(400).json({ error: `Strapi: ${e.response?.status === 404 ? "Not found" : e.message}` });
+    return res.status(400).json({ error: `Strapi: ${friendlyError(e)}` });
   }
   try {
     const pr = await c.sc.get(`/v1/project/${smartcatProjectId}`);
     projectName = pr.data?.name || smartcatProjectId;
     targetLanguages = pr.data?.targetLanguages || [];
   } catch (e) {
-    return res.status(400).json({ error: `Smartcat: ${e.response?.status === 404 ? "Not found" : e.message}` });
+    return res.status(400).json({ error: `Smartcat: ${friendlyError(e)}` });
   }
 
   reg[key] = {
@@ -307,10 +398,76 @@ app.get("/api/registry/:key/diff", async (req, res) => {
       currentFields: Object.keys(current),
       lastSentAt:   entry.lastSentAt || null,
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json({ error: friendlyError(e) }); }
 });
 
 // ─── Send (JSON to Smartcat) ─────────────────────────────────────────────────
+
+// ─── Shared send logic — used by both the API route and the webhook ───────────
+
+async function performSend(key, entry, c) {
+  const reg = loadRegistry();
+  const contentId = "article-" + entry.strapiDocumentId.slice(0, 8);
+
+  const r = await c.strapi.get(`/api/${c.strapiType}/${entry.strapiDocumentId}?locale=${c.strapiLocale}&populate=*`);
+  const data = r.data?.data ?? r.data;
+  const attrs = data?.attributes ?? data;
+
+  const payload = {};
+  for (const field of ["title", "shortDescription", "body"]) {
+    const val = attrs[field];
+    if (val && typeof val === "string" && val.trim()) payload[`${contentId}.${field}`] = val;
+  }
+  if (Object.keys(payload).length === 0) {
+    throw Object.assign(new Error("No translatable fields found."), { statusCode: 400 });
+  }
+
+  const projectR  = await c.sc.get(`/v1/project/${entry.smartcatProjectId}`);
+  const documents = projectR.data?.documents || [];
+  if (documents.length === 0) {
+    throw Object.assign(new Error("No documents in Smartcat project."), { statusCode: 400 });
+  }
+
+  const fileContent = JSON.stringify(payload, null, 2);
+  const { boundary, body } = makeBody(contentId, fileContent);
+  const docMap = {};
+  const updateResults = {};
+  const seen = new Set();
+
+  for (const doc of documents) {
+    if (seen.has(doc.id)) continue;
+    seen.add(doc.id);
+    const lang = (doc.targetLanguage || "").toLowerCase().split("-")[0];
+    try {
+      await c.sc.put(`/v1/document/update?documentId=${doc.id}`, body, {
+        headers: { "Content-Type": `multipart/form-data; boundary=${boundary}`, "Content-Length": body.length },
+      });
+      docMap[lang] = doc.id;
+      updateResults[lang] = "updated";
+    } catch (e) { updateResults[lang] = `failed: ${e.response?.status}`; }
+  }
+
+  const snapshot = {};
+  for (const [k, v] of Object.entries(payload)) snapshot[k.substring(k.indexOf(".") + 1)] = v;
+
+  reg[key].smartcatDocumentIds = docMap;
+  reg[key].targetLanguages = projectR.data?.targetLanguages || entry.targetLanguages;
+  reg[key].status = "uploaded";
+  reg[key].updatedAt = new Date().toISOString();
+  reg[key].lastSentSnapshot = snapshot;
+  reg[key].lastSentAt = new Date().toISOString();
+  saveRegistry(reg);
+
+  logActivity("send", {
+    articleTitle: attrs.title,
+    key,
+    projectName:  entry.projectName,
+    fieldsExtracted: Object.keys(payload),
+    updateResults,
+  });
+
+  return { key, fieldsExtracted: Object.keys(payload), docMap, updateResults, status: "uploaded" };
+}
 
 app.post("/api/registry/:key/send", async (req, res) => {
   const c = getCreds(req);
@@ -320,65 +477,12 @@ app.post("/api/registry/:key/send", async (req, res) => {
   const entry = reg[key];
   if (!entry) return res.status(404).json({ error: "Registry entry not found" });
 
-  const contentId = "article-" + entry.strapiDocumentId.slice(0, 8);
-
   try {
-    const r = await c.strapi.get(`/api/${c.strapiType}/${entry.strapiDocumentId}?locale=${c.strapiLocale}&populate=*`);
-    const data = r.data?.data ?? r.data;
-    const attrs = data?.attributes ?? data;
-
-    const payload = {};
-    for (const field of ["title", "shortDescription", "body"]) {
-      const val = attrs[field];
-      if (val && typeof val === "string" && val.trim()) payload[`${contentId}.${field}`] = val;
-    }
-    if (Object.keys(payload).length === 0) {
-      return res.status(400).json({ error: "No translatable fields found." });
-    }
-
-    const projectR  = await c.sc.get(`/v1/project/${entry.smartcatProjectId}`);
-    const documents = projectR.data?.documents || [];
-    if (documents.length === 0) return res.status(400).json({ error: "No documents in Smartcat project." });
-
-    const fileContent = JSON.stringify(payload, null, 2);
-    const { boundary, body } = makeBody(contentId, fileContent);
-    const docMap = {};
-    const updateResults = {};
-    const seen = new Set();
-
-    for (const doc of documents) {
-      if (seen.has(doc.id)) continue;
-      seen.add(doc.id);
-      const lang = (doc.targetLanguage || "").toLowerCase().split("-")[0];
-      try {
-        await c.sc.put(`/v1/document/update?documentId=${doc.id}`, body, {
-          headers: { "Content-Type": `multipart/form-data; boundary=${boundary}`, "Content-Length": body.length },
-        });
-        docMap[lang] = doc.id;
-        updateResults[lang] = "updated";
-      } catch (e) { updateResults[lang] = `failed: ${e.response?.status}`; }
-    }
-
-    const snapshot = {};
-    for (const [k, v] of Object.entries(payload)) snapshot[k.substring(k.indexOf(".") + 1)] = v;
-
-    reg[key].smartcatDocumentIds = docMap;
-    reg[key].targetLanguages = projectR.data?.targetLanguages || entry.targetLanguages;
-    reg[key].status = "uploaded";
-    reg[key].updatedAt = new Date().toISOString();
-    reg[key].lastSentSnapshot = snapshot;
-    reg[key].lastSentAt = new Date().toISOString();
-    saveRegistry(reg);
-
-    logActivity("send", {
-      articleTitle: attrs.title,
-      key,
-      projectName:  entry.projectName,
-      fieldsExtracted: Object.keys(payload),
-      updateResults,
-    });
-    res.json({ key, fieldsExtracted: Object.keys(payload), docMap, updateResults, status: "uploaded" });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const result = await performSend(key, entry, c);
+    res.json(result);
+  } catch (e) {
+    res.status(e.statusCode || 500).json({ error: e.statusCode ? e.message : friendlyError(e) });
+  }
 });
 
 // ─── Pull (Smartcat to Strapi) ───────────────────────────────────────────────
@@ -423,7 +527,7 @@ app.post("/api/registry/:key/pull", async (req, res) => {
 
       await c.strapi.put(`/api/${c.strapiType}/${entry.strapiDocumentId}?locale=${lang}`, { data: fields });
       results[lang] = { status: "synced", fields: Object.keys(fields), qa };
-    } catch (e) { results[lang] = { status: "failed", reason: e.message }; }
+    } catch (e) { results[lang] = { status: "failed", reason: friendlyError(e) }; }
   }
 
   const allSynced = Object.values(results).every((r) => r.status === "synced");
@@ -491,15 +595,19 @@ app.get("/api/registry/:key/xliff", async (req, res) => {
       }
     } catch { /* no existing translation, ignore */ }
 
-    const xml = toXliff(payload, { sourceLang: c.strapiLocale, targetLang, translations });
+    // Version defaults to 1.2 for backwards compatibility. Pass x-xliff-version: 2.0 to opt in.
+    const version = (req.headers["x-xliff-version"] || "1.2").toString();
+    const xml = version.startsWith("2")
+      ? toXliff2(payload, { sourceLang: c.strapiLocale, targetLang, translations })
+      : toXliff(payload,  { sourceLang: c.strapiLocale, targetLang, translations });
 
     const filename = `${contentId}.${targetLang}.xlf`;
     res.setHeader("Content-Type", "application/xliff+xml; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    logActivity("xliff-download", { articleTitle: entry.title, key, lang: targetLang, filename });
+    logActivity("xliff-download", { articleTitle: entry.title, key, lang: targetLang, filename, version });
     res.send(xml);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: friendlyError(e) });
   }
 });
 
@@ -521,7 +629,7 @@ app.post("/api/registry/:key/xliff", async (req, res) => {
   if (!xml.trim()) return res.status(400).json({ error: "Empty XLIFF body" });
 
   try {
-    const flat = fromXliff(xml);
+    const flat = fromXliffAny(xml);
 
     // Strip contentId prefix → field map
     const fields = {};
@@ -542,7 +650,7 @@ app.post("/api/registry/:key/xliff", async (req, res) => {
     logActivity("xliff-upload", { articleTitle: entry.title, key, lang: targetLang, fields: Object.keys(fields) });
     res.json({ key, lang: targetLang, fields: Object.keys(fields), status: "synced" });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: friendlyError(e) });
   }
 });
 
@@ -614,7 +722,7 @@ app.get("/api/registry/:key/locales", async (req, res) => {
       smartcatOnly,
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: friendlyError(e) });
   }
 });
 
@@ -677,14 +785,14 @@ app.post("/api/registry/:key/init-locales", async (req, res) => {
         );
         results[lang] = { status: "initialized", fields: Object.keys(sourceFields) };
       } catch (e) {
-        results[lang] = { status: "failed", reason: e.response?.data?.error?.message || e.message };
+        results[lang] = { status: "failed", reason: friendlyError(e) };
       }
     }
 
     logActivity("init-locales", { articleTitle: entry.title, key, results });
     res.json({ key, results });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: friendlyError(e) });
   }
 });
 
@@ -776,7 +884,7 @@ app.post("/api/registry/:key/add-strapi-locales", async (req, res) => {
         : null,
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: friendlyError(e) });
   }
 });
 
@@ -791,6 +899,61 @@ app.get("/api/activity", (req, res) => {
 app.delete("/api/activity", (req, res) => {
   clearActivity();
   res.json({ cleared: true });
+});
+
+// ─── Webhook: Strapi entry.publish → auto-send to Smartcat ───────────────────
+// Configure in: Strapi Admin → Settings → Webhooks → Create new
+// URL: https://your-public-middleware-url/webhook/strapi
+// Event: entry.publish
+//
+// Requires these environment variables on the server (not in Settings/localStorage,
+// since webhooks have no browser session):
+//   STRAPI_URL, STRAPI_API_TOKEN, STRAPI_CONTENT_TYPE, STRAPI_SOURCE_LOCALE,
+//   SMARTCAT_SERVER, SMARTCAT_ACCOUNT_ID, SMARTCAT_API_KEY
+//
+// Only articles already registered in LocaleSync (registry.json) are auto-sent.
+// If an article isn't registered, the webhook fires but does nothing.
+
+app.post("/webhook/strapi", async (req, res) => {
+  const { event, entry } = req.body || {};
+  console.log(`[webhook/strapi] event=${event}`);
+
+  if (event !== "entry.publish") {
+    return res.json({ skipped: true, reason: "not a publish event" });
+  }
+
+  const documentId = entry?.documentId ?? (entry?.id != null ? String(entry.id) : null);
+  if (!documentId) {
+    return res.status(400).json({ error: "No documentId in webhook payload" });
+  }
+
+  const c = getEnvCredentials();
+  if (!c) {
+    console.warn("[webhook/strapi] Missing env credentials — auto-send is not configured");
+    return res.json({ queued: false, reason: "Webhook credentials not configured on server" });
+  }
+
+  // Find every registry entry for this Strapi article (it may be linked to multiple
+  // Smartcat projects — send to all of them)
+  const reg     = loadRegistry();
+  const matches = Object.entries(reg).filter(([, e]) => e.strapiDocumentId === documentId);
+
+  if (matches.length === 0) {
+    console.log(`[webhook/strapi] documentId ${documentId} is not registered — skipping`);
+    return res.json({ skipped: true, reason: "Article not registered in LocaleSync" });
+  }
+
+  // Respond immediately so Strapi doesn't time out — process in the background
+  res.json({ queued: true, documentId, matchedEntries: matches.length });
+
+  for (const [key, entry] of matches) {
+    try {
+      await performSend(key, entry, c);
+      console.log(`[webhook/strapi] Auto-sent "${entry.title}" → ${entry.projectName || entry.smartcatProjectId} ✓`);
+    } catch (e) {
+      console.error(`[webhook/strapi] Auto-send failed for "${entry.title}":`, e.message);
+    }
+  }
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
