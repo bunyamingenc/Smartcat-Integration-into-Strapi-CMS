@@ -271,17 +271,6 @@ Actions available:
 
 ---
 
-## Roadmap
-
-- [ ] Deploy to Railway + Vercel (publicly usable)
-- [x] SQLite registry
-- [x] QA report after pull (placeholder validation, HTML tag integrity)
-- [ ] Pseudo-localization mode
-- [x] Webhook auto-send on Strapi publish
-- [x] XLIFF 2.0 support
-
----
-
 [github.com/bunyamingenc](https://github.com/bunyamingenc)
 
 ---
